@@ -1,7 +1,9 @@
 """
 AERSI-style risk score computed from AQI data (simplified variant).
 Uses AQI/500 as pollution load proxy in place of WHO-normalized concentrations.
-Bands match aersi.live: Very Low / Low / Moderate / High / Extreme.
+Band labels match aersi.live. Scores in this simplified variant range
+~0.15–1.2 (Very Low to Moderate) since AQI/500 compresses PL relative
+to WHO-normalized concentrations.
 
     AERSI = PL^0.50 * EPF^0.25 * VSF^0.25
 

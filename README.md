@@ -28,6 +28,9 @@ AERSI = PL^0.50 × EPF^0.25 × VSF^0.25
 
 This repo computes an AQI-based simplified variant using the same formula
 structure; full concentration-level scoring is at aersi.live.
+Band labels match aersi.live. Scores in this simplified variant range
+~0.15–1.2 (Very Low to Moderate) since AQI/500 compresses PL relative
+to WHO-normalized concentrations.
 
 Where:
 - **PL** = Pollution Load (WHO-normalized pollutant concentrations over the 30-day window)
