@@ -8,7 +8,7 @@
 
 ## What It Does
 
-AERSI predicts **next-day AQI** for **583 Indian monitoring stations** using an XGBoost model trained on 9 months of air quality data + meteorological features. When the forecast crosses dangerous thresholds (AQI > 200), AWS Lambda automatically dispatches **SMS and email alerts** to subscribers in affected cities — giving people 24 hours of advance warning to protect themselves.
+AERSI predicts **next-day AQI and computes AERSI risk scores per station** for **583 Indian monitoring stations** using an XGBoost model trained on 9 months of air quality data + meteorological features. When the forecast crosses dangerous thresholds (AQI > 200), AWS Lambda automatically dispatches **SMS and email alerts** to subscribers in affected cities — giving people 24 hours of advance warning to protect themselves.
 
 ---
 
@@ -31,7 +31,13 @@ Where:
 - **EPF** = Exposure Persistence Factor (fraction of days with AQI > 100)
 - **VSF** = Variability Severity Factor (median day-to-day AQI change)
 
-Severity bands: Good → Satisfactory → Moderate → Poor → Very Poor → Severe
+AERSI is computed as a rolling 30-day score per station by `src/compute_aersi.py`
+from the station-day AQI panel. The forecast model predicts tomorrow's AQI, and
+alert thresholds are applied to that predicted AQI.
+
+AERSI bands: Low (< 0.2) → Moderate (< 0.4) → High (< 0.6) → Very High (< 0.8) → Extreme
+
+AQI alert threshold: Poor / Very Poor / Severe (AQI > 200)
 
 ---
 
@@ -142,15 +148,12 @@ The core Lambda function (`aersi-alert-dispatcher`):
 ```
 AERSI Air Quality Alert — Delhi
 
-Tomorrow's forecast for your city:
-• Anand Vihar:  AQI 312 (Very Poor)
-• Punjabi Bagh: AQI 287 (Poor)
-• Chandni Chowk: AQI 334 (Very Poor)
+Tomorrow’s AQI forecast for your city (2026-10-12):
+Station: Anand Vihar | AQI: 312 | Severity: Very Poor
+Station: Chandni Chowk | AQI: 334 | Severity: Very Poor
 
-Health advice: Avoid outdoor activity. Use N95 masks if going out.
-Sensitive groups (children, elderly, respiratory conditions) should stay indoors.
-
-— AERSI Forecast System
+Action: Avoid outdoor activity. N95 mask recommended.
+— AERSI System
 ```
 
 ---
@@ -189,6 +192,7 @@ python src/train_forecast.py
 ## Impact
 
 - **583 stations** across India covered
+- AERSI composite risk scores computed per station (rolling 30-day window)
 - **24-hour advance warning** before dangerous air quality events
 - Personalized alerts by city — no spam, relevant information only
 - Boundary layer height (BLH) as key feature — captures atmospheric conditions that trap pollutants overnight
