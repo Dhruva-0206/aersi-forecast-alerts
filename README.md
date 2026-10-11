@@ -26,11 +26,11 @@ The Air Exposure Severity Index (AERSI) is computed as:
 AERSI = PL^0.50 × EPF^0.25 × VSF^0.25
 ```
 
-This repo computes an AQI-based simplified variant using the same formula
-structure; full concentration-level scoring is at aersi.live.
-Band labels match aersi.live. Scores in this simplified variant range
-~0.15–1.2 (Very Low to Moderate) since AQI/500 compresses PL relative
-to WHO-normalized concentrations.
+This repo computes AERSI from WHO-normalized pollutant concentrations
+(PM2.5, PM10, NO2, SO2, ozone) extracted from 148 daily CPCB snapshots.
+PL uses burden-of-disease weights (PM2.5: 0.40, PM10: 0.20, NO2: 0.15,
+ozone: 0.15, SO2: 0.10) with WHO 24h guidelines as reference. Scores align with aersi.live
+band definitions: Low → Moderate → High → Extreme.
 
 Where:
 - **PL** = Pollution Load (WHO-normalized pollutant concentrations over the 30-day window)
@@ -198,7 +198,8 @@ python src/train_forecast.py
 ## Impact
 
 - **583 stations** across India covered
-- AERSI composite risk scores computed per station (rolling 30-day window)
+- WHO-normalized AERSI scores from real pollutant concentrations (PM2.5, PM10,
+  NO2, SO2, ozone) across 572 stations
 - **24-hour advance warning** before dangerous air quality events
 - Personalized alerts by city — no spam, relevant information only
 - Boundary layer height (BLH) as key feature — captures atmospheric conditions that trap pollutants overnight

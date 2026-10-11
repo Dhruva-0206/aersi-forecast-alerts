@@ -5,8 +5,8 @@ concentrations in the station-day panel.
     AERSI = PL^0.50 * EPF^0.25 * VSF^0.25
 
     PL  = rolling 30-day mean of the daily load
-          (norm_pm25^0.6 + norm_pm10^0.4 + norm_no2^0.3 + norm_so2^0.3 + norm_ozone^0.2) / n
-          where norm_p = concentration / WHO guideline and n = pollutants present that day
+          sum_p w_p * (conc_p / WHO_p)^0.6, weights renormalized over the pollutants
+          present that day
     EPF = 1 + fraction of observed days in the window with AQI > 100
     VSF = 1 + tanh(median |AQI[t] - AQI[t-1]| / 45), consecutive calendar days only
 
@@ -30,13 +30,15 @@ MIN_PERIODS = 7
 AQI_EXCEED  = 100     # EPF exceedance threshold
 VSF_SCALE   = 45.0
 
-# column: (WHO guideline in ug/m3, saturation exponent)
+EXPONENT = 0.6  # sub-linear saturation, same for every pollutant
+
+# column: (WHO guideline in ug/m3, burden-of-disease weight)
 POLLUTANTS = {
-    "pm25":  (15.0,  0.6),
-    "pm10":  (45.0,  0.4),
-    "no2":   (25.0,  0.3),
-    "so2":   (40.0,  0.3),
-    "ozone": (100.0, 0.2),
+    "pm25":  (15.0, 0.40),
+    "pm10":  (45.0, 0.20),
+    "no2":   (25.0, 0.15),
+    "so2":   (40.0, 0.10),
+    "ozone": (60.0, 0.15),
 }
 
 BANDS = [(0.6, "Very Low"), (1.0, "Low"), (1.5, "Moderate"), (2.0, "High")]
@@ -52,11 +54,13 @@ def aersi_band(x: float) -> str:
 
 
 def daily_load(df: pd.DataFrame) -> pd.Series:
-    """Mean over the pollutants present that day of (conc / WHO)^exponent."""
-    terms = pd.DataFrame({
-        col: (df[col] / guideline) ** exp for col, (guideline, exp) in POLLUTANTS.items()
-    })
-    return terms.mean(axis=1, skipna=True)  # NaN when no pollutant is present
+    """Weighted sum of (conc / WHO)^0.6, weights renormalized over pollutants present."""
+    terms = pd.DataFrame({col: (df[col] / g) ** EXPONENT for col, (g, _) in POLLUTANTS.items()})
+    weights = pd.DataFrame({col: np.where(df[col].notna(), w, 0.0)
+                            for col, (_, w) in POLLUTANTS.items()}, index=df.index)
+    present = weights.sum(axis=1)
+    load = (terms.fillna(0.0) * weights).sum(axis=1) / present.where(present > 0)
+    return load  # NaN when no pollutant is present
 
 
 def station_scores(g: pd.DataFrame) -> pd.DataFrame:
