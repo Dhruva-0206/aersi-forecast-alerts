@@ -28,12 +28,12 @@
     "is_winter",
     "is_monsoon"
   ],
-  "val_mae": 25.17,
-  "val_rmse": 42.66,
-  "val_r2": 0.646,
-  "baseline_mae": 26.14,
-  "train_rows": 39164,
-  "val_rows": 7625,
+  "val_mae": 25.57,
+  "val_rmse": 43.76,
+  "val_r2": 0.648,
+  "baseline_mae": 26.79,
+  "train_rows": 54748,
+  "val_rows": 10972,
   "train_date_range": "2026-01-15 to 2026-08-31",
   "val_date_range": "2026-09-01 to 2026-09-24"
 }
