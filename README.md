@@ -26,6 +26,9 @@ The Air Exposure Severity Index (AERSI) is computed as:
 AERSI = PL^0.50 × EPF^0.25 × VSF^0.25
 ```
 
+This repo computes an AQI-based simplified variant using the same formula
+structure; full concentration-level scoring is at aersi.live.
+
 Where:
 - **PL** = Pollution Load (WHO-normalized pollutant concentrations over the 30-day window)
 - **EPF** = Exposure Persistence Factor (fraction of days with AQI > 100)
@@ -35,7 +38,7 @@ AERSI is computed as a rolling 30-day score per station by `src/compute_aersi.py
 from the station-day AQI panel. The forecast model predicts tomorrow's AQI, and
 alert thresholds are applied to that predicted AQI.
 
-AERSI bands: Very Low (< 0.6) → Low (< 0.8) → Moderate (< 1.0) → High (< 1.2) → Very High (< 1.5) → Extreme
+AERSI bands: Very Low (< 0.6) → Low (< 1.0) → Moderate (< 1.5) → High (< 2.0) → Extreme
 
 AQI alert threshold: Poor / Very Poor / Severe (AQI > 200)
 

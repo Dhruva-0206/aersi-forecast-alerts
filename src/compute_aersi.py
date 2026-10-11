@@ -1,5 +1,7 @@
 """
-Compute rolling 30-day AERSI scores per station from the station-day AQI panel.
+AERSI-style risk score computed from AQI data (simplified variant).
+Uses AQI/500 as pollution load proxy in place of WHO-normalized concentrations.
+Bands match aersi.live: Very Low / Low / Moderate / High / Extreme.
 
     AERSI = PL^0.50 * EPF^0.25 * VSF^0.25
 
@@ -26,7 +28,7 @@ AQI_REF     = 500.0   # PL normalization
 AQI_EXCEED  = 100     # EPF exceedance threshold
 VSF_SCALE   = 45.0
 
-BANDS = [(0.6, "Very Low"), (0.8, "Low"), (1.0, "Moderate"), (1.2, "High"), (1.5, "Very High")]
+BANDS = [(0.6, "Very Low"), (1.0, "Low"), (1.5, "Moderate"), (2.0, "High")]
 
 
 def aersi_band(x: float) -> str:
@@ -77,7 +79,7 @@ def main():
     print(f"Stations:       {out['station'].nunique()}")
     print(f"AERSI mean/min/max: {out['AERSI'].mean():.3f} / {out['AERSI'].min():.3f} / {out['AERSI'].max():.3f}")
     print("Band distribution:")
-    order = ["Very Low", "Low", "Moderate", "High", "Very High", "Extreme"]
+    order = ["Very Low", "Low", "Moderate", "High", "Extreme"]
     counts = out["aersi_band"].value_counts().reindex(order).fillna(0).astype(int)
     for name, n in counts.items():
         print(f"  {name:<10} {n:>6}  ({100 * n / len(out):.1f}%)")
