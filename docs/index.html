@@ -1,0 +1,580 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AERSI Forecast and Alerts</title>
+<meta name="description" content="Next-day AQI forecasts and SMS or email alerts for 583 Indian monitoring stations, built on the Air Exposure Severity Index.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,700;12..96,800&family=Instrument+Sans:ital,wght@0,400;0,500;0,600;1,400&family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #f7f8fc;
+  --bg2: #f0f2f8;
+  --bg3: #e8ecf4;
+  --surface: #ffffff;
+  --border: rgba(30, 64, 175, 0.08);
+  --border2: rgba(30, 64, 175, 0.16);
+  --text: #0f1629;
+  --text2: #3d4f6e;
+  --text3: #7a8ba8;
+  --accent: #0d6efd;
+  --accent2: #0552cc;
+  --accent-soft: rgba(13, 110, 253, 0.08);
+  --very-low: #16a34a;
+  --low: #65a30d;
+  --moderate: #d97706;
+  --high: #ea580c;
+  --extreme: #dc2626;
+  --font-display: 'Bricolage Grotesque', sans-serif;
+  --font-body: 'Instrument Sans', sans-serif;
+  --font-serif: 'Instrument Serif', serif;
+  --font-mono: 'JetBrains Mono', monospace;
+  --r1: 4px;
+  --r2: 8px;
+  --r3: 16px;
+  --nav-h: 64px;
+  --shadow: 0 1px 2px rgba(15, 22, 41, 0.05), 0 4px 14px rgba(15, 22, 41, 0.05);
+  --shadow-up: 0 2px 4px rgba(15, 22, 41, 0.08), 0 10px 24px rgba(13, 110, 253, 0.18);
+  --ease: cubic-bezier(0.4, 0, 0.2, 1);
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; -webkit-font-smoothing: antialiased; }
+body {
+  font-family: var(--font-body);
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.6;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+a { color: var(--accent); }
+button, input, select { font: inherit; color: inherit; }
+
+/* nav */
+.nav {
+  position: fixed; inset: 0 0 auto 0; height: var(--nav-h); z-index: 50;
+  display: flex; align-items: center; gap: 1.5rem; padding: 0 2rem;
+  background: rgba(247, 248, 252, 0.92);
+  backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px);
+  border-bottom: 1px solid var(--border2);
+}
+.brand {
+  display: flex; align-items: center; gap: 0.6rem; flex-shrink: 0;
+  font-family: var(--font-display); font-weight: 800; font-size: 1.25rem;
+  letter-spacing: -0.03em; color: var(--text); text-decoration: none;
+}
+.mark { width: 30px; height: 30px; border-radius: var(--r2); background: var(--accent); display: grid; place-items: center; }
+.tabs { display: flex; gap: 0.15rem; flex: 1; overflow-x: auto; scrollbar-width: none; }
+.tabs::-webkit-scrollbar { display: none; }
+.tab {
+  background: none; border: 0; cursor: pointer; white-space: nowrap;
+  padding: 0.45rem 0.95rem; border-radius: var(--r2);
+  font-size: 0.875rem; font-weight: 500; color: var(--text2);
+  transition: color 0.2s var(--ease), background 0.2s var(--ease);
+}
+.tab:hover { color: var(--text); background: var(--bg3); }
+.tab[aria-selected="true"] { color: var(--accent); background: var(--accent-soft); font-weight: 600; }
+.asof {
+  font-family: var(--font-mono); font-size: 0.7rem; color: var(--text2);
+  border: 1px solid var(--border2); border-radius: var(--r1); padding: 0.3rem 0.6rem; white-space: nowrap;
+  background: var(--surface);
+}
+
+/* buttons */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 0.4rem;
+  border: 1px solid transparent; border-radius: var(--r2); cursor: pointer;
+  padding: 0.7rem 1.25rem; font-size: 0.9rem; font-weight: 600; text-decoration: none;
+  transition: transform 0.2s var(--ease), box-shadow 0.2s var(--ease), background 0.2s var(--ease);
+}
+.btn:hover { transform: translateY(-1px); }
+.btn:active { transform: translateY(0); }
+.btn:focus-visible, .tab:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.btn-primary { background: var(--accent); color: #fff; box-shadow: 0 1px 2px rgba(13, 110, 253, 0.3); }
+.btn-primary:hover { background: var(--accent2); box-shadow: var(--shadow-up); }
+.btn-ghost { background: var(--surface); color: var(--text); border-color: var(--border2); box-shadow: var(--shadow); }
+.btn-ghost:hover { box-shadow: 0 2px 4px rgba(15, 22, 41, 0.08), 0 10px 24px rgba(15, 22, 41, 0.1); }
+.btn[disabled] { opacity: 0.6; cursor: progress; transform: none; box-shadow: none; }
+
+/* layout */
+main { padding-top: var(--nav-h); }
+.panel { display: none; }
+.panel.on { display: block; animation: rise 0.35s var(--ease); }
+@keyframes rise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+.wrap { max-width: 1160px; margin: 0 auto; padding: 0 2rem; }
+.eyebrow { font-family: var(--font-mono); font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text3); }
+h1, h2, h3 { font-family: var(--font-display); letter-spacing: -0.035em; line-height: 1.05; }
+h1 { font-size: clamp(2.4rem, 5.4vw, 4.2rem); font-weight: 800; }
+h2 { font-size: clamp(1.7rem, 3.2vw, 2.5rem); font-weight: 700; }
+h3 { font-size: 1.15rem; font-weight: 700; letter-spacing: -0.02em; }
+.ital { font-family: var(--font-serif); font-style: italic; font-weight: 400; color: var(--accent); letter-spacing: -0.01em; }
+.lede { font-size: 1.08rem; color: var(--text2); max-width: 34rem; }
+.mono { font-family: var(--font-mono); }
+
+/* home */
+.hero { padding: 4.5rem 0 3.5rem; position: relative; }
+.hero-grid { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 0.75fr); gap: 3rem; align-items: start; }
+.hero h1 { margin: 1rem 0 1.4rem; }
+.cta { display: flex; flex-wrap: wrap; gap: 0.75rem; margin-top: 2rem; }
+.board {
+  background: var(--surface); border: 1px solid var(--border2); border-radius: var(--r3);
+  box-shadow: var(--shadow); padding: 1.25rem 1.25rem 0.5rem; margin-top: 2.2rem; margin-right: -1.5rem;
+}
+.board h3 { font-size: 0.95rem; }
+.board .sub { font-size: 0.78rem; color: var(--text3); margin: 0.15rem 0 0.9rem; }
+.board ol { list-style: none; }
+.board li { display: grid; grid-template-columns: 1fr auto; gap: 0.15rem 0.75rem; padding: 0.7rem 0; border-top: 1px solid var(--border); }
+.board .name { font-size: 0.85rem; font-weight: 500; line-height: 1.3; }
+.board .score { font-family: var(--font-mono); font-size: 0.95rem; font-weight: 500; text-align: right; }
+.meter { grid-column: 1 / -1; height: 4px; border-radius: 2px; background: var(--bg3); overflow: hidden; }
+.meter i { display: block; height: 100%; border-radius: 2px; }
+
+.statbar { background: var(--text); color: #fff; }
+.stats { display: grid; grid-template-columns: repeat(4, auto); justify-content: space-between; gap: 1rem; padding: 1.6rem 2rem; }
+.stat { padding-left: 1.25rem; border-left: 1px solid rgba(255, 255, 255, 0.18); }
+.stat:first-child { border-left: 0; padding-left: 0; }
+.stat b { display: block; font-family: var(--font-display); font-size: clamp(1.5rem, 2.8vw, 2.2rem); font-weight: 700; letter-spacing: -0.03em; line-height: 1.1; }
+.stat span { font-family: var(--font-mono); font-size: 0.7rem; letter-spacing: 0.06em; text-transform: uppercase; color: rgba(255, 255, 255, 0.6); }
+
+.explain { padding: 5rem 0 3rem; }
+.explain-grid { display: grid; grid-template-columns: minmax(0, 7fr) minmax(0, 4fr); gap: 4rem; align-items: start; }
+.pull { font-family: var(--font-serif); font-size: clamp(1.7rem, 3.2vw, 2.4rem); line-height: 1.2; letter-spacing: -0.01em; }
+.pull em { color: var(--accent); }
+.explain p { color: var(--text2); margin-top: 1.1rem; max-width: 38rem; }
+.versus { border-left: 2px solid var(--accent); padding-left: 1.25rem; display: grid; gap: 1.3rem; }
+.versus dt { font-family: var(--font-mono); font-size: 0.7rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text3); }
+.versus dd { font-size: 0.95rem; color: var(--text); margin-top: 0.15rem; }
+
+.legend { padding: 2rem 0 5rem; }
+.bandbar { display: flex; height: 44px; border-radius: var(--r2); overflow: hidden; margin: 1.5rem 0 1rem; box-shadow: var(--shadow); }
+.bandbar div { min-width: 6px; }
+.chips { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 0.75rem; }
+.chip { font-size: 0.82rem; }
+.chip .dot { display: inline-block; width: 10px; height: 10px; border-radius: var(--r1); margin-right: 0.45rem; vertical-align: -1px; }
+.chip b { font-weight: 600; }
+.chip small { display: block; font-family: var(--font-mono); font-size: 0.7rem; color: var(--text3); margin-top: 0.1rem; }
+
+/* tables */
+.page { padding: 3.5rem 0 5rem; }
+.page-head { margin-bottom: 2rem; max-width: 40rem; }
+.page-head p { color: var(--text2); margin-top: 0.8rem; }
+.split { display: grid; grid-template-columns: minmax(0, 1fr) 280px; gap: 2.5rem; align-items: start; }
+.tablebox { background: var(--surface); border: 1px solid var(--border2); border-radius: var(--r3); box-shadow: var(--shadow); overflow: hidden; }
+table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+th { text-align: left; font-family: var(--font-mono); font-weight: 500; font-size: 0.68rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text3); padding: 0.85rem 1rem; background: var(--bg2); border-bottom: 1px solid var(--border2); }
+td { padding: 0.8rem 1rem; border-bottom: 1px solid var(--border); vertical-align: middle; }
+tr:last-child td { border-bottom: 0; }
+tbody tr { transition: background 0.15s var(--ease); }
+tbody tr:hover { background: var(--bg2); }
+td.num, th.num { text-align: right; font-family: var(--font-mono); }
+.badge { display: inline-block; padding: 0.15rem 0.55rem; border-radius: var(--r1); font-size: 0.74rem; font-weight: 600; color: #fff; white-space: nowrap; }
+.b-vl { background: var(--very-low); } .b-l { background: var(--low); } .b-m { background: var(--moderate); }
+.b-h { background: var(--high); } .b-e { background: var(--extreme); }
+.rowbar { display: block; width: 100%; min-width: 90px; height: 6px; background: var(--bg3); border-radius: 3px; overflow: hidden; }
+.rowbar i { display: block; height: 100%; }
+.aside { position: sticky; top: calc(var(--nav-h) + 1.5rem); }
+.aside h3 { margin-bottom: 0.9rem; }
+.aside ul { list-style: none; display: grid; gap: 0.55rem; font-size: 0.9rem; }
+.aside li { display: flex; justify-content: space-between; border-bottom: 1px dashed var(--border2); padding-bottom: 0.45rem; }
+.aside li span:last-child { font-family: var(--font-mono); }
+.aside p { font-size: 0.82rem; color: var(--text3); margin-top: 1rem; }
+
+/* forecast */
+.fc-grid { display: grid; grid-template-columns: 300px minmax(0, 1fr); gap: 3rem; align-items: start; }
+.facts { display: grid; gap: 1.1rem; }
+.facts div { border-top: 1px solid var(--border2); padding-top: 0.7rem; }
+.facts dt { font-family: var(--font-mono); font-size: 0.68rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text3); }
+.facts dd { font-size: 0.95rem; margin-top: 0.15rem; }
+.win { color: var(--very-low); font-weight: 600; }
+.card {
+  background: var(--surface); border: 1px solid var(--border2); border-radius: var(--r3); box-shadow: var(--shadow);
+}
+.fc-card { margin-top: 2rem; overflow: hidden; }
+.fc-card header { display: flex; justify-content: space-between; align-items: baseline; gap: 1rem; flex-wrap: wrap; padding: 1.1rem 1.25rem; border-bottom: 1px solid var(--border2); background: var(--bg2); }
+.fc-card header p { font-size: 0.8rem; color: var(--text3); }
+.fc-card footer { padding: 0.9rem 1.25rem; font-size: 0.85rem; color: var(--text2); border-top: 1px solid var(--border2); }
+.fc-card footer b { color: var(--text); }
+
+/* alerts */
+.al-grid { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 6fr); gap: 3rem; align-items: start; }
+form.card { padding: 1.6rem; }
+.field { display: grid; gap: 0.35rem; margin-bottom: 1.1rem; }
+label { font-size: 0.82rem; font-weight: 600; }
+.hint { font-size: 0.75rem; color: var(--text3); font-weight: 400; }
+input, select {
+  width: 100%; padding: 0.7rem 0.8rem; background: var(--bg); border: 1px solid var(--border2); border-radius: var(--r2);
+  transition: border-color 0.2s var(--ease), box-shadow 0.2s var(--ease);
+}
+input:focus, select:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); outline: none; }
+.msg { margin-top: 1rem; padding: 0.8rem 1rem; border-radius: var(--r2); font-size: 0.88rem; display: none; border: 1px solid; }
+.msg.ok { display: block; background: rgba(22, 163, 74, 0.08); border-color: rgba(22, 163, 74, 0.35); color: #166534; }
+.msg.err { display: block; background: rgba(220, 38, 38, 0.07); border-color: rgba(220, 38, 38, 0.35); color: #991b1b; }
+.sms { background: var(--text); color: #e8ecf4; border-radius: var(--r3); padding: 1.5rem; font-family: var(--font-mono); font-size: 0.8rem; line-height: 1.7; white-space: pre-wrap; box-shadow: var(--shadow); }
+.sms .h { color: #fff; font-weight: 500; }
+.sms .vp { color: #fb923c; } .sms .p { color: #fbbf24; }
+.note { font-size: 0.85rem; color: var(--text2); margin-top: 1rem; }
+.note b { color: var(--text); }
+.tag { font-family: var(--font-mono); font-size: 0.68rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text3); margin-bottom: 0.6rem; }
+
+footer.site { border-top: 1px solid var(--border2); padding: 2rem 0 3rem; font-size: 0.82rem; color: var(--text3); }
+footer.site .wrap { display: flex; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
+
+@media (max-width: 860px) {
+  .nav { padding: 0 1rem; gap: 0.75rem; }
+  .asof { display: none; }
+  .wrap { padding: 0 1.1rem; }
+  .hero { padding-top: 2.5rem; }
+  .hero-grid, .explain-grid, .split, .fc-grid, .al-grid { grid-template-columns: 1fr; gap: 2rem; }
+  .board { margin-right: 0; margin-top: 0; }
+  .stats { grid-template-columns: 1fr 1fr; padding: 1.4rem 1.1rem; row-gap: 1.4rem; }
+  .stat:nth-child(odd) { border-left: 0; padding-left: 0; }
+  .chips { grid-template-columns: 1fr 1fr; }
+  .aside { position: static; }
+  .rowbar-cell { display: none; }
+  td, th { padding: 0.7rem 0.6rem; }
+}
+@media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+</style>
+</head>
+<body>
+
+<header class="nav">
+  <a class="brand" href="#home" data-go="home" aria-label="AERSI home">
+    <span class="mark" aria-hidden="true">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round">
+        <path d="M12 12m0 0c0-1.2 1-2 2-2 1.7 0 3 1.4 3 3.2 0 2.5-2.2 4.4-4.8 4.4-3.4 0-6.2-2.8-6.2-6.4 0-4.2 3.5-7.7 7.9-7.7 5 0 9.1 4 9.1 9"/>
+      </svg>
+    </span>
+    AERSI
+  </a>
+  <nav class="tabs" role="tablist" aria-label="Sections">
+    <button class="tab" role="tab" data-go="home" aria-selected="true">Home</button>
+    <button class="tab" role="tab" data-go="map" aria-selected="false">AERSI Map</button>
+    <button class="tab" role="tab" data-go="forecast" aria-selected="false">Forecast</button>
+    <button class="tab" role="tab" data-go="alerts" aria-selected="false">SMS Alerts</button>
+  </nav>
+  <span class="asof">Scores to 25 Sep 2026</span>
+</header>
+
+<main>
+
+<!-- HOME -->
+<section class="panel on" id="p-home">
+  <div class="wrap hero">
+    <div class="hero-grid">
+      <div>
+        <div class="eyebrow">Air Exposure Severity Index</div>
+        <h1>24-hour <span class="ital">advance warning</span> before dangerous air hits your city</h1>
+        <p class="lede">Most air quality tools tell you what the air is doing right now. AERSI scores how heavy, how persistent and how erratic a station's air has been over 30 days, and a boundary layer aware model forecasts tomorrow's AQI so you hear about it tonight.</p>
+        <div class="cta">
+          <button class="btn btn-primary" data-go="alerts">Get SMS Alerts</button>
+          <button class="btn btn-ghost" data-go="forecast">View Forecast</button>
+        </div>
+      </div>
+      <aside class="board" aria-label="Highest AERSI stations">
+        <h3>Highest AERSI on 25 Sep 2026</h3>
+        <p class="sub">From 452 stations reporting that day</p>
+        <ol id="board"></ol>
+      </aside>
+    </div>
+  </div>
+
+  <div class="statbar">
+    <div class="wrap stats">
+      <div class="stat"><b>572</b><span>stations scored</span></div>
+      <div class="stat"><b>59,537</b><span>station-days</span></div>
+      <div class="stat"><b>1.347</b><span>mean AERSI</span></div>
+      <div class="stat"><b>5.1%</b><span>station-days Extreme</span></div>
+    </div>
+  </div>
+
+  <div class="wrap explain">
+    <div class="explain-grid">
+      <div>
+        <p class="pull">An AQI reading is a photograph. People with asthma, young children and outdoor workers need the <em>forecast</em>, and the history behind it.</p>
+        <p>AERSI multiplies three things: how far pollutants sit above WHO guidelines over a 30-day window, how often the AQI crossed 100, and how violently it swings from one day to the next. A station can post a modest AQI today and still score high because it has been bad for weeks. The forecast side then predicts the next-day AQI for 583 stations and sends an alert to people in cities where it will cross 200.</p>
+      </div>
+      <dl class="versus">
+        <div><dt>Snapshot AQI says</dt><dd>One number, for the latest reading only.</dd></div>
+        <div><dt>AERSI adds</dt><dd>Intensity, persistence and volatility across 30 days.</dd></div>
+        <div><dt>The forecast adds</dt><dd>Tomorrow, delivered by SMS or email at 8 PM IST.</dd></div>
+      </dl>
+    </div>
+  </div>
+
+  <div class="wrap legend">
+    <div class="eyebrow">Severity bands</div>
+    <h2 style="margin-top:0.6rem">Where 59,537 station-days landed</h2>
+    <div class="bandbar" role="img" aria-label="Share of station-days per band: Very Low 0.1%, Low 12.8%, Moderate 57.1%, High 24.9%, Extreme 5.1%">
+      <div style="flex:0.1;background:var(--very-low)"></div>
+      <div style="flex:12.8;background:var(--low)"></div>
+      <div style="flex:57.1;background:var(--moderate)"></div>
+      <div style="flex:24.9;background:var(--high)"></div>
+      <div style="flex:5.1;background:var(--extreme)"></div>
+    </div>
+    <div class="chips">
+      <div class="chip"><span class="dot" style="background:var(--very-low)"></span><b>Very Low</b><small>below 0.6 / 0.1%</small></div>
+      <div class="chip"><span class="dot" style="background:var(--low)"></span><b>Low</b><small>0.6 to 1.0 / 12.8%</small></div>
+      <div class="chip"><span class="dot" style="background:var(--moderate)"></span><b>Moderate</b><small>1.0 to 1.5 / 57.1%</small></div>
+      <div class="chip"><span class="dot" style="background:var(--high)"></span><b>High</b><small>1.5 to 2.0 / 24.9%</small></div>
+      <div class="chip"><span class="dot" style="background:var(--extreme)"></span><b>Extreme</b><small>2.0 and above / 5.1%</small></div>
+    </div>
+  </div>
+</section>
+
+<!-- MAP -->
+<section class="panel" id="p-map">
+  <div class="wrap page">
+    <div class="page-head">
+      <div class="eyebrow">AERSI scores</div>
+      <h2 style="margin-top:0.6rem">572 stations, scored on a 30-day window</h2>
+      <p>Twelve stations across ten metros, taken from the latest scored day in the repository, 25 Sep 2026. Delhi NCR sits well above the rest.</p>
+    </div>
+    <div class="split">
+      <div class="tablebox">
+        <table>
+          <thead><tr><th>Station</th><th>City</th><th class="num">AERSI</th><th class="rowbar-cell"></th><th>Band</th></tr></thead>
+          <tbody id="mapbody"></tbody>
+        </table>
+      </div>
+      <aside class="aside">
+        <h3>25 Sep 2026, all stations</h3>
+        <ul>
+          <li><span>Reporting</span><span>452</span></li>
+          <li><span>Median AERSI</span><span>1.20</span></li>
+          <li><span>Very Low</span><span>1</span></li>
+          <li><span>Low</span><span>54</span></li>
+          <li><span>Moderate</span><span>291</span></li>
+          <li><span>High</span><span>104</span></li>
+          <li><span>Extreme</span><span>2</span></li>
+        </ul>
+        <p>Full interactive map with all stations lives at <a href="https://www.aersi.live" target="_blank" rel="noopener">aersi.live</a>.</p>
+      </aside>
+    </div>
+  </div>
+</section>
+
+<!-- FORECAST -->
+<section class="panel" id="p-forecast">
+  <div class="wrap page">
+    <div class="page-head">
+      <div class="eyebrow">Next-day AQI model</div>
+      <h2 style="margin-top:0.6rem">Beats "tomorrow equals today", most where it matters</h2>
+      <p>Trained on January to August 2026, tested on September 2026 with a time-based split. Persistence, which repeats today's AQI, is the baseline.</p>
+    </div>
+
+    <div class="fc-grid">
+      <dl class="facts">
+        <div><dt>Model</dt><dd>XGBoost, native <span class="mono">xgb.train</span></dd></div>
+        <div><dt>Features</dt><dd>27: AQI lags and rolling means, weather, calendar</dd></div>
+        <div><dt>Data</dt><dd>9 months, 583 stations, 54,748 training station-days</dd></div>
+        <div><dt>Key weather feature</dt><dd>Boundary layer height. Low overnight mixing depth traps pollutants near the ground.</dd></div>
+      </dl>
+
+      <div>
+        <div class="tablebox">
+          <table>
+            <thead><tr><th>Metric</th><th class="num">XGBoost</th><th class="num">Persistence</th></tr></thead>
+            <tbody>
+              <tr><td>MAE</td><td class="num win">25.6</td><td class="num">26.8</td></tr>
+              <tr><td>RMSE</td><td class="num win">43.8</td><td class="num">49.7</td></tr>
+              <tr><td>R squared</td><td class="num win">0.648</td><td class="num">not applicable</td></tr>
+              <tr><td>RMSE on days starting above AQI 300 (n=538)</td><td class="num win">94.0 (21% better)</td><td class="num">119.1</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="note">The 21% gain holds for days that start above AQI 300. For days that end above 300 the model tends to underpredict the jump into a spike, so alerts are tied to the forecast band and not to a single number.</p>
+
+        <div class="card fc-card">
+          <header>
+            <h3>Delhi, forecast for 23 Sep 2026</h3>
+            <p>Held-out validation example, model run on 22 Sep data</p>
+          </header>
+          <table>
+            <thead><tr><th>Station</th><th class="num">Forecast AQI</th><th>Band</th><th class="num">Observed</th></tr></thead>
+            <tbody>
+              <tr><td>Anand Vihar</td><td class="num">325</td><td><span class="badge b-e">Very Poor</span></td><td class="num">334</td></tr>
+              <tr><td>Rohini</td><td class="num">311</td><td><span class="badge b-e">Very Poor</span></td><td class="num">335</td></tr>
+              <tr><td>Okhla Phase-2</td><td class="num">260</td><td><span class="badge b-h">Poor</span></td><td class="num">316</td></tr>
+            </tbody>
+          </table>
+          <footer><b>Forecast dispatched nightly at 8 PM IST</b> via EventBridge and Lambda.</footer>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ALERTS -->
+<section class="panel" id="p-alerts">
+  <div class="wrap page">
+    <div class="page-head">
+      <div class="eyebrow">Alerts</div>
+      <h2 style="margin-top:0.6rem">Hear it the evening before, not the morning of</h2>
+      <p>Pick your city. When tomorrow's forecast AQI passes 200 at a station there, you get a message with the station, the expected AQI and what to do about it.</p>
+    </div>
+
+    <div class="al-grid">
+      <form class="card" id="signup" novalidate>
+        <div class="field">
+          <label for="f-name">Name</label>
+          <input id="f-name" name="name" autocomplete="name" required maxlength="80">
+        </div>
+        <div class="field">
+          <label for="f-contact">Phone or email <span class="hint">(+91XXXXXXXXXX or name@example.com)</span></label>
+          <input id="f-contact" name="contact" autocomplete="off" required maxlength="120" inputmode="email">
+        </div>
+        <div class="field">
+          <label for="f-city">City</label>
+          <select id="f-city" name="city" required></select>
+        </div>
+        <button class="btn btn-primary" type="submit" id="f-submit" style="width:100%">Get SMS Alerts</button>
+        <div id="f-msg" class="msg" role="status" aria-live="polite"></div>
+      </form>
+
+      <div>
+        <div class="tag">What an alert looks like</div>
+<div class="sms" aria-label="Sample alert message"><span class="h">AERSI Air Quality Alert for Delhi</span>
+Hi Dhruva, tomorrow's air quality forecast:
+
+  Anand Vihar, Delhi - DPCC: <span class="vp">Very Poor</span> (AQI ~324)
+  Rohini, Delhi - DPCC: <span class="vp">Very Poor</span> (AQI ~311)
+  Okhla Phase-2, Delhi - DPCC: <span class="p">Poor</span> (AQI ~260)
+
+Action: Avoid all outdoor activity. N95 mask essential.
+
+Powered by AERSI | aersi.live</div>
+        <p class="note"><b>Alerts via AWS SNS every evening at 8 PM IST</b> when forecast AQI exceeds 200. Email subscribers must confirm the AWS opt-in message before the first alert is delivered.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<footer class="site">
+  <div class="wrap">
+    <span>AERSI Forecast and Alerts. Built for Environmental Hacks, WeMakeDevs x AWS, October 2026.</span>
+    <span>Data: CPCB via data.gov.in, weather: Open-Meteo ERA5.</span>
+  </div>
+</footer>
+
+<script>
+(function () {
+  var ENDPOINT = "https://bhxkqp2tyfbr4scvhwpt7foe7i0ccgmr.lambda-url.ap-south-1.on.aws/";
+
+  // Real AERSI scores from data/processed/station_aersi.csv, 25 Sep 2026
+  var TOP = [
+    ["Anthoni Pillai Nagar, Gummidipoondi", 2.07, "e"],
+    ["Nagar Palika Parishad, Baraut", 2.02, "e"],
+    ["Sector-116, Noida", 1.99, "h"],
+    ["Sector-18, Panipat", 1.96, "h"],
+    ["Sector-2 IMT, Manesar", 1.95, "h"],
+    ["Teri Gram, Gurugram", 1.92, "h"]
+  ];
+  var ROWS = [
+    ["Anand Vihar", "Delhi", 1.88, "h"],
+    ["Sector-116", "Noida", 1.99, "h"],
+    ["Teri Gram", "Gurugram", 1.92, "h"],
+    ["Bandra Kurla Complex", "Mumbai", 1.01, "m"],
+    ["Jadavpur", "Kolkata", 1.33, "m"],
+    ["BTM Layout", "Bengaluru", 1.19, "m"],
+    ["ECIL Kapra", "Hyderabad", 1.12, "m"],
+    ["Gomti Nagar", "Lucknow", 1.28, "m"],
+    ["Govt. High School Shikarpur", "Patna", 1.18, "m"],
+    ["FTI Kidwai Nagar", "Kanpur", 1.25, "m"],
+    ["Arumbakkam", "Chennai", 1.27, "m"],
+    ["Hadapsar", "Pune", 1.23, "m"]
+  ];
+  var BAND = { vl: ["Very Low", "--very-low"], l: ["Low", "--low"], m: ["Moderate", "--moderate"], h: ["High", "--high"], e: ["Extreme", "--extreme"] };
+  var CITIES = ["Agra","Ahmedabad","Asansol","Aurangabad","Bengaluru","Byrnihat","Chennai","Delhi","Durgapur","Faridabad","Gandhinagar","Ghaziabad","Gurugram","Guwahati","Gwalior","Howrah","Hyderabad","Indore","Jabalpur","Jaipur","Jodhpur","Kanpur","Kolkata","Lucknow","Meerut","Moradabad","Mumbai","Nagpur","Nashik","Navi Mumbai","Noida","Patna","Pimpri-Chinchwad","Pune","Raipur","Varanasi","Vijayawada"];
+
+  function el(tag, cls, html) { var e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; }
+  function pct(v) { return Math.min(100, (v / 2.5) * 100).toFixed(0) + "%"; }
+
+  var board = document.getElementById("board");
+  TOP.forEach(function (r) {
+    var li = el("li");
+    li.appendChild(el("span", "name", r[0]));
+    li.appendChild(el("span", "score", r[1].toFixed(2)));
+    var m = el("span", "meter", '<i style="width:' + pct(r[1]) + ";background:var(" + BAND[r[2]][1] + ')"></i>');
+    li.appendChild(m);
+    board.appendChild(li);
+  });
+
+  var body = document.getElementById("mapbody");
+  ROWS.forEach(function (r) {
+    var b = BAND[r[3]];
+    var tr = el("tr");
+    tr.innerHTML = "<td>" + r[0] + "</td><td>" + r[1] + '</td><td class="num">' + r[2].toFixed(2) +
+      '</td><td class="rowbar-cell"><span class="rowbar"><i style="width:' + pct(r[2]) + ";background:var(" + b[1] + ')"></i></span></td>' +
+      '<td><span class="badge b-' + r[3] + '">' + b[0] + "</span></td>";
+    body.appendChild(tr);
+  });
+
+  var sel = document.getElementById("f-city");
+  sel.appendChild(new Option("Choose your city", ""));
+  CITIES.forEach(function (c) { sel.appendChild(new Option(c, c)); });
+
+  // tabs
+  var tabs = document.querySelectorAll(".tab");
+  var panels = { home: "p-home", map: "p-map", forecast: "p-forecast", alerts: "p-alerts" };
+  function show(name, push) {
+    if (!panels[name]) name = "home";
+    Object.keys(panels).forEach(function (k) { document.getElementById(panels[k]).classList.toggle("on", k === name); });
+    tabs.forEach(function (t) { t.setAttribute("aria-selected", t.dataset.go === name ? "true" : "false"); });
+    if (push && location.hash !== "#" + name) history.replaceState(null, "", "#" + name);
+    window.scrollTo(0, 0);
+  }
+  document.addEventListener("click", function (e) {
+    var t = e.target.closest("[data-go]");
+    if (t) { e.preventDefault(); show(t.dataset.go, true); }
+  });
+  window.addEventListener("hashchange", function () { show(location.hash.slice(1), false); });
+  show(location.hash.slice(1) || "home", false);
+
+  // sign-up
+  var form = document.getElementById("signup"), msg = document.getElementById("f-msg"), btn = document.getElementById("f-submit");
+  function say(kind, text) { msg.className = "msg " + kind; msg.textContent = text; }
+
+  form.addEventListener("submit", function (e) {
+    e.preventDefault();
+    var name = form.name.value.trim(), contact = form.contact.value.trim().replace(/\s+/g, ""), city = form.city.value;
+    if (!name) return say("err", "Enter your name so the alert can address you.");
+    var isEmail = contact.indexOf("@") > -1;
+    if (!contact) return say("err", "Enter a phone number (+91XXXXXXXXXX) or an email address.");
+    if (isEmail && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(contact)) return say("err", "That email address looks incomplete. Use the form name@example.com.");
+    if (!isEmail && !/^\+91[6-9]\d{9}$/.test(contact)) return say("err", "Phone numbers must start with +91 followed by 10 digits, for example +919812345678.");
+    if (!city) return say("err", "Choose the city you want alerts for.");
+
+    btn.disabled = true; btn.textContent = "Subscribing...";
+    say("ok", "Sending your sign-up to the alert service...");
+    fetch(ENDPOINT, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: name, contact: contact, city: city })
+    }).then(function (r) {
+      return r.text().then(function (t) {
+        var data = {}; try { data = JSON.parse(t); } catch (x) {}
+        if (r.ok) {
+          var extra = isEmail ? " Check your inbox for the AWS confirmation email and click Confirm subscription." : "";
+          say("ok", (data.message || ("Subscribed " + name + " (" + contact + ") for " + city + " alerts.")) + extra);
+          form.reset();
+        } else if (r.status === 400) {
+          say("err", "The service rejected the sign-up: " + (data.error || "name, contact and city are all required") + ".");
+        } else {
+          say("err", "The alert service answered with HTTP " + r.status + (data.error ? " (" + data.error + ")" : "") + ". Your details were not saved, please try again in a minute.");
+        }
+      });
+    }).catch(function () {
+      say("err", "Could not reach the alert service. Check your connection. If you opened this page from a file, the browser may block the request, so load it from the hosted site instead.");
+    }).then(function () {
+      btn.disabled = false; btn.textContent = "Get SMS Alerts";
+    });
+  });
+})();
+</script>
+</body>
+</html>
