@@ -26,7 +26,7 @@ print("Loading weather features...")
 weather = pd.read_csv(WEATHER, parse_dates=["date"])
 
 df = panel.merge(weather, on=["date", "station"], how="inner")
-print(f"Merged: {len(df):,} rows | {df['station'].nunique()} stations | {df['date'].min().date()} → {df['date'].max().date()}")
+print(f"Merged: {len(df):,} rows | {df['station'].nunique()} stations | {df['date'].min().date()} -> {df['date'].max().date()}")
 
 print("Engineering features...")
 df = df.sort_values(["station", "date"]).reset_index(drop=True)
@@ -81,16 +81,36 @@ persistence_mae  = np.mean(np.abs(val["AQI"].values - y_val.values))
 persistence_rmse = np.sqrt(np.mean((val["AQI"].values - y_val.values)**2))
 print(f"\nBaseline (persistence) — MAE: {persistence_mae:.1f}  RMSE: {persistence_rmse:.1f}")
 
-from xgboost import XGBRegressor
-model = XGBRegressor(
-    n_estimators=500, max_depth=6, learning_rate=0.05,
-    subsample=0.8, colsample_bytree=0.8, min_child_weight=5,
-    reg_alpha=0.1, reg_lambda=1.0, random_state=42, n_jobs=-1,
-    early_stopping_rounds=30, eval_metric="mae",
-)
-model.fit(X_train, y_train, eval_set=[(X_val, y_val)], verbose=50)
+import xgboost as xgb
 
-preds = np.clip(model.predict(X_val), 0, 500)
+dtrain = xgb.DMatrix(X_train, label=y_train)
+dval   = xgb.DMatrix(X_val,   label=y_val)
+
+params = {
+    "objective":        "reg:squarederror",
+    "eval_metric":      "mae",
+    "max_depth":        6,
+    "learning_rate":    0.05,
+    "subsample":        0.8,
+    "colsample_bytree": 0.8,
+    "min_child_weight": 5,
+    "reg_alpha":        0.1,
+    "reg_lambda":       1.0,
+    "seed":             42,
+    "nthread":          -1,
+}
+
+booster = xgb.train(
+    params,
+    dtrain,
+    num_boost_round=500,
+    evals=[(dval, "val")],
+    early_stopping_rounds=30,
+    verbose_eval=50,
+)
+
+# Booster.predict uses all rounds by default; restrict to the early-stopping best
+preds = np.clip(booster.predict(xgb.DMatrix(X_val), iteration_range=(0, booster.best_iteration + 1)), 0, 500)
 mae  = np.mean(np.abs(preds - y_val.values))
 rmse = np.sqrt(np.mean((preds - y_val.values)**2))
 r2   = 1 - np.sum((preds - y_val.values)**2) / np.sum((y_val.values - y_val.mean())**2)
@@ -101,14 +121,14 @@ print(f"vs Persistence — MAE: {persistence_mae:.1f}  RMSE: {persistence_rmse:.
 print(f"Improvement:  MAE -{persistence_mae-mae:.1f}  RMSE -{persistence_rmse-rmse:.1f}")
 print(f"{'='*50}")
 
-fi = pd.Series(model.feature_importances_, index=FEATURES).sort_values(ascending=False)
+fi = pd.Series(booster.get_score(importance_type="gain")).reindex(FEATURES).fillna(0).sort_values(ascending=False)
 print("\nTop 15 features:")
 print(fi.head(15).to_string())
 
 model_path = OUT_DIR / "aersi_forecast_model.pkl"
 with open(model_path, "wb") as f:
-    pickle.dump({"model": model, "features": FEATURES}, f)
-print(f"\nModel saved → {model_path}")
+    pickle.dump({"model": booster, "features": FEATURES}, f)
+print(f"\nModel saved -> {model_path}")
 
 val_out = val[["date","station","city","state","AQI"]].copy()
 val_out["predicted_AQI"] = preds
