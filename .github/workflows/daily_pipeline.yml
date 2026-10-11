@@ -45,3 +45,10 @@ jobs:
           git add data/snapshots/ data/processed/station_daily_panel.csv data/processed/station_aersi.csv
           git diff --cached --quiet || git commit -m "data: daily snapshot $(date -u '+%Y-%m-%d')"
           git push
+
+      - name: Deploy to S3
+        run: aws s3 cp docs/index.html s3://aersi-forecast-alerts/index.html
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: ap-south-1
