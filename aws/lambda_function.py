@@ -7,6 +7,7 @@ Hackathon: Environmental Hacks, WeMakeDevs x AWS, Oct 2026
 import json
 import os
 import boto3
+from boto3.dynamodb.conditions import Key
 import logging
 from datetime import datetime, timezone, timedelta
 
@@ -23,8 +24,13 @@ table    = dynamodb.Table(TABLE_NAME)
 
 
 def get_subscribers():
+    items = []
     response = table.scan()
-    return response.get("Items", [])
+    items.extend(response.get("Items", []))
+    while "LastEvaluatedKey" in response:
+        response = table.scan(ExclusiveStartKey=response["LastEvaluatedKey"])
+        items.extend(response.get("Items", []))
+    return items
 
 
 def send_alert(subscriber, alerts):
