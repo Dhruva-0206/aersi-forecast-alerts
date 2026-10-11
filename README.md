@@ -37,20 +37,7 @@ Severity bands: Good → Satisfactory → Moderate → Poor → Very Poor → Se
 
 ## Architecture
 
-```
-Open-Meteo API (historical weather)
-        ↓
-XGBoost Forecast Model (trained locally)
-        ↓
-AWS Lambda (aersi-alert-dispatcher)
-    ├── reads aersi-subscribers (DynamoDB)
-    ├── filters Alert-worthy stations (AQI > 200)
-    └── publishes to aersi-alerts (SNS Topic)
-              ↓
-    SMS + Email to subscribers
-              ↑
-EventBridge (daily cron: 8 PM IST)
-```
+![AERSI System Architecture](https://gitdiagram.com/dhruva-0206/aersi-forecast-alerts)
 
 ### AWS Services Used
 | Service | Role |
@@ -59,6 +46,22 @@ EventBridge (daily cron: 8 PM IST)
 | **Amazon SNS** | SMS & email delivery to subscribers |
 | **Amazon DynamoDB** | Subscriber registry (city, contact, preferences) |
 | **Amazon EventBridge** | Daily schedule trigger (cron 8 PM IST) |
+
+## How It Works
+
+1. **Data collection** — 148 daily AQI snapshots from 583 Indian monitoring stations
+   are parsed into a station-day panel (66,881 rows).
+2. **Weather enrichment** — Open-Meteo ERA5 reanalysis provides 7 meteorological
+   variables per station per day: boundary layer height, wind speed, wind direction,
+   temperature, humidity, precipitation, surface pressure.
+3. **Forecasting** — XGBoost predicts next-day AQI using 27 features. The model is
+   trained on Jan–Aug 2026 with a time-based split (validation on Sep 2026).
+4. **Alert dispatch** — Every evening at 8 PM IST, EventBridge fires the Lambda.
+   It identifies stations forecast above AQI 200, matches them to subscribers in
+   DynamoDB, and sends personalized SMS/email alerts via SNS.
+5. **Subscription** — Users register their city and contact details. They receive
+   alerts only for their city, only when air quality is forecast dangerous.
+
 
 ---
 
@@ -80,6 +83,7 @@ EventBridge (daily cron: 8 PM IST)
 | MAE | **25.6** | 26.8 |
 | RMSE | **43.8** | 49.7 |
 | R² | **0.648** | — |
+| RMSE on days starting above AQI 300 (n=538) | **94.0** | 119.1 |
 
 The model reduces RMSE by **11.9%** vs. a naive "tomorrow = today" baseline — most critically, it handles dangerous spike events better, which is exactly when alerts matter.
 
@@ -189,6 +193,25 @@ python src/train_forecast.py
 - Personalized alerts by city — no spam, relevant information only
 - Boundary layer height (BLH) as key feature — captures atmospheric conditions that trap pollutants overnight
 - Built to scale: SNS handles millions of notifications, DynamoDB scales to any subscriber count
+
+---
+
+## Key Technical Decisions
+
+**Boundary layer height (BLH) as a key weather feature** — BLH is the atmospheric mixing
+height that determines how far pollutants disperse. Low BLH overnight traps
+emissions from traffic and industry, causing the severe morning spikes India
+experiences in winter. BLH from ERA5 reanalysis (`blh_min`) is the highest-ranked
+weather feature by gain, though recent AQI history dominates the model overall.
+
+**Native XGBoost API** — The model uses `xgb.train()` directly rather than the
+scikit-learn wrapper, avoiding a Windows Application Control policy that blocks
+`_radius_neighbors` DLL imports. This also gives finer control over early stopping
+and feature importance extraction via gain scores.
+
+**Batch weather fetch** — Open-Meteo's archive API accepts comma-joined
+lat/lon arrays. Fetching 10 stations per API call reduced total requests from
+583 to 59, staying within rate limits without parallelism.
 
 ---
 
