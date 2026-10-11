@@ -4,7 +4,6 @@ AERSI subscriber registration Lambda
 Adds a user to the aersi-subscribers DynamoDB table and subscribes them to SNS.
 """
 import json, boto3, os
-from boto3.dynamodb.conditions import Key
 
 SNS_TOPIC_ARN = os.environ["SNS_TOPIC_ARN"]
 dynamodb = boto3.resource("dynamodb", region_name="ap-south-1")
@@ -25,7 +24,7 @@ def lambda_handler(event, context):
 
     # Save to DynamoDB
     table = dynamodb.Table("aersi-subscribers")
-    table.put_item(Item={"contact": contact, "name": name, "city": city, "protocol": protocol})
+    table.put_item(Item={"email": contact, "name": name, "city": city, "protocol": protocol})
 
     return {
         "statusCode": 200,

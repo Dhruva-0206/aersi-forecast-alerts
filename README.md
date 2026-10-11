@@ -1,5 +1,5 @@
 # AERSI Forecast + Alert System
-### Air Environment Risk & Severity Index — Predictive AQI Forecasting for India
+### Air Exposure Severity Index — Predictive AQI Forecasting for India
 
 > **Environmental Hacks Hackathon** · WeMakeDevs × AWS · Air Track · Oct 2026  
 > Built by **Dhruva Chakrabarty**
@@ -20,16 +20,16 @@ India has over 200 million people living in cities with hazardous air quality. C
 
 ## AERSI Formula
 
-The Air Environment Risk & Severity Index (AERSI) is computed as:
+The Air Exposure Severity Index (AERSI) is computed as:
 
 ```
 AERSI = PL^0.50 × EPF^0.25 × VSF^0.25
 ```
 
 Where:
-- **PL** = Pollution Level (AQI normalized 0–1)
-- **EPF** = Exposure Potential Factor (population density weight)
-- **VSF** = Vulnerable Sector Factor (% of population at risk)
+- **PL** = Pollution Load (WHO-normalized AQI over the 30-day window)
+- **EPF** = Exposure Persistence Factor (fraction of days with AQI > 100)
+- **VSF** = Variability Severity Factor (standard deviation of AQI)
 
 Severity bands: Good → Satisfactory → Moderate → Poor → Very Poor → Severe
 
@@ -81,7 +81,7 @@ EventBridge (daily cron: 8 PM IST)
 | RMSE | **43.8** | 49.7 |
 | R² | **0.648** | — |
 
-The model reduces RMSE by **11.8%** vs. a naive "tomorrow = today" baseline — most critically, it handles dangerous spike events better, which is exactly when alerts matter.
+The model reduces RMSE by **11.9%** vs. a naive "tomorrow = today" baseline — most critically, it handles dangerous spike events better, which is exactly when alerts matter.
 
 ---
 
@@ -92,7 +92,7 @@ data/snapshots/          ← 148 daily AQI snapshots (Jan–Sep 2026)
         ↓  build_station_panel.py
 data/processed/station_daily_panel.csv    ← 66,881 rows, 583 stations
         +
-data/processed/weather_features.csv      ← 141,015 rows (Open-Meteo ERA5)
+data/processed/weather_features.csv      ← 148,665 rows (Open-Meteo ERA5)
         ↓  train_forecast.py
 data/processed/aersi_forecast_model.pkl  ← XGBoost booster (705KB)
 data/processed/forecast_validation.csv   ← Sep 2026 predictions
