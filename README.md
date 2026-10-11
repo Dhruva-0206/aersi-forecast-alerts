@@ -35,7 +35,7 @@ AERSI is computed as a rolling 30-day score per station by `src/compute_aersi.py
 from the station-day AQI panel. The forecast model predicts tomorrow's AQI, and
 alert thresholds are applied to that predicted AQI.
 
-AERSI bands: Low (< 0.2) → Moderate (< 0.4) → High (< 0.6) → Very High (< 0.8) → Extreme
+AERSI bands: Very Low (< 0.6) → Low (< 0.8) → Moderate (< 1.0) → High (< 1.2) → Very High (< 1.5) → Extreme
 
 AQI alert threshold: Poor / Very Poor / Severe (AQI > 200)
 
