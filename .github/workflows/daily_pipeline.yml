@@ -1,0 +1,47 @@
+name: AERSI Daily Pipeline
+
+on:
+  schedule:
+    # 10:30 AM IST = 05:00 UTC
+    - cron: "0 5 * * *"
+  workflow_dispatch:
+    # Allows manual trigger from GitHub Actions tab
+
+jobs:
+  run-pipeline:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: write  # needed to commit snapshot data back to repo
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Fetch daily CPCB snapshot
+        env:
+          DATA_GOV_API_KEY: ${{ secrets.DATA_GOV_API_KEY }}
+        run: python src/fetch/fetch_snapshot.py
+
+      - name: Build station panel
+        run: python src/build_station_panel.py
+
+      - name: Compute AERSI scores
+        run: python src/compute_aersi.py
+
+      - name: Commit new snapshot and outputs
+        continue-on-error: false
+        run: |
+          git config user.name  "aersi-bot"
+          git config user.email "aersi-bot@users.noreply.github.com"
+          git add data/snapshots/ data/processed/station_daily_panel.csv data/processed/station_aersi.csv
+          git diff --cached --quiet || git commit -m "data: daily snapshot $(date -u '+%Y-%m-%d')"
+          git push
