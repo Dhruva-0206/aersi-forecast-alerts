@@ -37,7 +37,7 @@ Severity bands: Good → Satisfactory → Moderate → Poor → Very Poor → Se
 
 ## Architecture
 
-[View System Architecture Diagram](https://gitdiagram.com/dhruva-0206/aersi-forecast-alerts)
+![AERSI System Architecture](docs/architecture.png)
 
 ### AWS Services Used
 | Service | Role |
