@@ -30,6 +30,7 @@ exec(compile(_src.split(_marker)[0], str(AQI_SRC), "exec"), _ns)
 sub_index = _ns["sub_index"]
 
 FNAME_RE = re.compile(r"(\d{4}-\d{2}-\d{2})\.csv$")
+POLLUTANT_COLS = ["pm25", "pm10", "no2", "so2", "ozone"]
 
 # ── Per-snapshot station AQI (same rules as compute_aqi.py) ──────────────────
 
@@ -60,7 +61,24 @@ def snapshot_panel(path: Path, snap_date: str) -> pd.DataFrame:
             "longitude": first["longitude"],
             "AQI":       aqi,
         })
-    return pd.DataFrame(rows)
+    out = pd.DataFrame(rows)
+
+    # Raw per-pollutant concentrations in wide format (NH3 / CO are not in the AQI breakpoints)
+    pivot = df.pivot_table(
+        index=["station", "city", "state", "latitude", "longitude"],
+        columns="pollutant_id",
+        values="avg_value",
+        aggfunc="first",
+    ).reset_index()
+    pivot = pivot.rename(columns={"PM2.5": "pm25", "PM10": "pm10", "NO2": "no2",
+                                  "SO2": "so2", "OZONE": "ozone"})
+    keep = [c for c in POLLUTANT_COLS if c in pivot.columns]
+    pivot = pivot[["station"] + keep].drop_duplicates("station")
+    out = out.merge(pivot, on="station", how="left")
+    for c in POLLUTANT_COLS:
+        if c not in out.columns:
+            out[c] = np.nan
+    return out
 
 # ── Main ─────────────────────────────────────────────────────────────────────
 
@@ -89,6 +107,8 @@ def main():
     print(f"Total rows:         {len(panel)}")
     print(f"Date range:         {panel['snapshot_date'].min()} -> {panel['snapshot_date'].max()}")
     print(f"Unique stations:    {panel['station'].nunique()}")
+    for c in POLLUTANT_COLS:
+        print(f"Null % {c:<6}:        {100 * panel[c].isna().mean():.1f}%")
     print(f"Null AQI dropped:   {dropped} of {total} station-days ({100 * dropped / total:.1f}%)")
 
 

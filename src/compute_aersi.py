@@ -1,15 +1,16 @@
 """
-AERSI-style risk score computed from AQI data (simplified variant).
-Uses AQI/500 as pollution load proxy in place of WHO-normalized concentrations.
-Band labels match aersi.live. Scores in this simplified variant range
-~0.15–1.2 (Very Low to Moderate) since AQI/500 compresses PL relative
-to WHO-normalized concentrations.
+Compute rolling 30-day AERSI scores per station from WHO-normalized pollutant
+concentrations in the station-day panel.
 
     AERSI = PL^0.50 * EPF^0.25 * VSF^0.25
 
-    PL  = rolling 30-day mean AQI / 500
+    PL  = rolling 30-day mean of the daily load
+          (norm_pm25^0.6 + norm_pm10^0.4 + norm_no2^0.3 + norm_so2^0.3 + norm_ozone^0.2) / n
+          where norm_p = concentration / WHO guideline and n = pollutants present that day
     EPF = 1 + fraction of observed days in the window with AQI > 100
     VSF = 1 + tanh(median |AQI[t] - AQI[t-1]| / 45), consecutive calendar days only
+
+Bands: Very Low < 0.6 <= Low < 1.0 <= Moderate < 1.5 <= High < 2.0 <= Extreme.
 
 Input:  data/processed/station_daily_panel.csv
 Output: data/processed/station_aersi.csv
@@ -26,9 +27,17 @@ OUT_FILE   = Path("data/processed/station_aersi.csv")
 
 WINDOW      = "30D"
 MIN_PERIODS = 7
-AQI_REF     = 500.0   # PL normalization
 AQI_EXCEED  = 100     # EPF exceedance threshold
 VSF_SCALE   = 45.0
+
+# column: (WHO guideline in ug/m3, saturation exponent)
+POLLUTANTS = {
+    "pm25":  (15.0,  0.6),
+    "pm10":  (45.0,  0.4),
+    "no2":   (25.0,  0.3),
+    "so2":   (40.0,  0.3),
+    "ozone": (100.0, 0.2),
+}
 
 BANDS = [(0.6, "Very Low"), (1.0, "Low"), (1.5, "Moderate"), (2.0, "High")]
 
@@ -42,19 +51,28 @@ def aersi_band(x: float) -> str:
     return "Extreme"
 
 
+def daily_load(df: pd.DataFrame) -> pd.Series:
+    """Mean over the pollutants present that day of (conc / WHO)^exponent."""
+    terms = pd.DataFrame({
+        col: (df[col] / guideline) ** exp for col, (guideline, exp) in POLLUTANTS.items()
+    })
+    return terms.mean(axis=1, skipna=True)  # NaN when no pollutant is present
+
+
 def station_scores(g: pd.DataFrame) -> pd.DataFrame:
     g = g.sort_values("date").copy()
-    s = g.set_index("date")["AQI"]
+    idx = g["date"]
+    aqi = pd.Series(g["AQI"].to_numpy(), index=idx)
+    load = pd.Series(daily_load(g).to_numpy(), index=idx)
 
     # Day-to-day change only between consecutive calendar days; diffs that
     # span a data gap are not a day-to-day change
-    gap_days = s.index.to_series().diff().dt.days
-    delta = s.diff().abs().where(gap_days.eq(1))
+    gap_days = idx.diff().dt.days.to_numpy()
+    delta = aqi.diff().abs().where(gap_days == 1)
 
-    roll = s.rolling(WINDOW, min_periods=MIN_PERIODS)
-    g["PL"]  = (roll.mean() / AQI_REF).to_numpy()
-    g["EPF"] = 1 + (s.gt(AQI_EXCEED).astype(float).where(s.notna())
-                     .rolling(WINDOW, min_periods=MIN_PERIODS).mean()).to_numpy()
+    g["PL"]  = load.rolling(WINDOW, min_periods=MIN_PERIODS).mean().to_numpy()
+    g["EPF"] = 1 + (aqi.gt(AQI_EXCEED).astype(float).where(aqi.notna())
+                       .rolling(WINDOW, min_periods=MIN_PERIODS).mean()).to_numpy()
     med = delta.rolling(WINDOW, min_periods=1).median()
     g["VSF"] = (1 + np.tanh(med.fillna(0.0) / VSF_SCALE)).to_numpy()  # no pairs -> 1.0
     return g
