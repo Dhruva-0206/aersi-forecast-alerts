@@ -27,9 +27,9 @@ AERSI = PL^0.50 × EPF^0.25 × VSF^0.25
 ```
 
 Where:
-- **PL** = Pollution Load (WHO-normalized AQI over the 30-day window)
+- **PL** = Pollution Load (WHO-normalized pollutant concentrations over the 30-day window)
 - **EPF** = Exposure Persistence Factor (fraction of days with AQI > 100)
-- **VSF** = Variability Severity Factor (standard deviation of AQI)
+- **VSF** = Variability Severity Factor (median day-to-day AQI change)
 
 Severity bands: Good → Satisfactory → Moderate → Poor → Very Poor → Severe
 
