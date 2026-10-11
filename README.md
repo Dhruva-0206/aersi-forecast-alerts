@@ -20,30 +20,22 @@ India has over 200 million people living in cities with hazardous air quality. C
 
 ## AERSI Formula
 
-The Air Exposure Severity Index (AERSI) is computed as:
-
 ```
 AERSI = PL^0.50 × EPF^0.25 × VSF^0.25
 ```
 
-This repo computes AERSI from WHO-normalized pollutant concentrations
-(PM2.5, PM10, NO2, SO2, ozone) extracted from 148 daily CPCB snapshots.
-PL uses burden-of-disease weights (PM2.5: 0.40, PM10: 0.20, NO2: 0.15,
-ozone: 0.15, SO2: 0.10) with WHO 24h guidelines as reference. Scores align with aersi.live
-band definitions: Low → Moderate → High → Extreme.
+Components (30-day rolling window):
+- **PL (Pollution Load)** = weighted mean of (pollutant / WHO_limit)^0.6 across PM2.5, PM10, NO2, SO2, Ozone
+  - Weights: PM2.5 = 0.40, PM10 = 0.20, NO2 = 0.15, Ozone = 0.15, SO2 = 0.10
+  - WHO limits: PM2.5 = 15, PM10 = 45, NO2 = 25, Ozone = 60, SO2 = 40 µg/m³
+- **EPF (Exposure Persistence Factor)** = 1 + fraction(days with AQI > 100 in window) [range 1.0–2.0]
+- **VSF (Variability Severity Factor)** = 1 + tanh(median day-to-day AQI change / 45) [range 1.0–2.0]
 
-Where:
-- **PL** = Pollution Load (WHO-normalized pollutant concentrations over the 30-day window)
-- **EPF** = Exposure Persistence Factor (fraction of days with AQI > 100)
-- **VSF** = Variability Severity Factor (median day-to-day AQI change)
+Severity bands: Very Low (<0.6) | Low (<1.0) | Moderate (<1.5) | High (<2.0) | Extreme (≥2.0)
 
-AERSI is computed as a rolling 30-day score per station by `src/compute_aersi.py`
-from the station-day AQI panel. The forecast model predicts tomorrow's AQI, and
-alert thresholds are applied to that predicted AQI.
-
-AERSI bands: Very Low (< 0.6) → Low (< 1.0) → Moderate (< 1.5) → High (< 2.0) → Extreme
-
-AQI alert threshold: Poor / Very Poor / Severe (AQI > 200)
+Current results from 148 CPCB snapshots (Jan–Sep 2026):
+- 572 stations, 59,537 station-days, mean AERSI 1.347
+- Band split: Very Low 0.1% | Low 12.8% | Moderate 57.1% | High 24.9% | Extreme 5.1%
 
 ---
 
@@ -58,6 +50,18 @@ AQI alert threshold: Poor / Very Poor / Severe (AQI > 200)
 | **Amazon SNS** | SMS & email delivery to subscribers |
 | **Amazon DynamoDB** | Subscriber registry (city, contact, preferences) |
 | **Amazon EventBridge** | Daily schedule trigger (cron 8 PM IST) |
+
+**Subscriber sign-up endpoint** (Lambda Function URL):
+`https://bhxkqp2tyfbr4scvhwpt7foe7i0ccgmr.lambda-url.ap-south-1.on.aws/`
+Auth: NONE · CORS enabled · public endpoint for subscriber sign-up
+
+## Live Data Pipeline
+
+- GitHub Actions runs daily at 10:30 AM IST (`.github/workflows/daily_pipeline.yml`).
+- `src/fetch/fetch_snapshot.py` hits the data.gov.in CPCB API, paginates, and saves a daily CSV to `data/snapshots/`.
+- `src/build_station_panel.py` pivots the snapshots into a wide station-day panel with pollutant columns.
+- `src/compute_aersi.py` computes WHO-normalized AERSI per station.
+- Requires `DATA_GOV_API_KEY` in GitHub Secrets (Settings → Secrets and variables → Actions).
 
 ## How It Works
 
@@ -95,7 +99,7 @@ AQI alert threshold: Poor / Very Poor / Severe (AQI > 200)
 | MAE | **25.6** | 26.8 |
 | RMSE | **43.8** | 49.7 |
 | R² | **0.648** | — |
-| RMSE on days starting above AQI 300 (n=538) | **94.0** | 119.1 |
+| RMSE on days starting above AQI 300 (n=538) — **21% better** | **94.0** | 119.1 |
 
 The model reduces RMSE by **11.9%** vs. a naive "tomorrow = today" baseline — most critically, it handles dangerous spike events better, which is exactly when alerts matter.
 
@@ -121,15 +125,24 @@ data/processed/model_metadata.json       ← metrics + feature list
 
 ```
 aersi-forecast-alerts/
+├── .github/workflows/
+│   └── daily_pipeline.yml       # Daily CI: fetch -> panel -> AERSI
 ├── src/
-│   ├── build_station_panel.py   # Builds daily AQI panel from 148 snapshots
+│   ├── fetch/
+│   │   └── fetch_snapshot.py    # Fetches the daily CPCB snapshot (data.gov.in)
+│   ├── process/
+│   │   └── compute_aqi.py       # CPCB sub-index AQI breakpoints
+│   ├── build_station_panel.py   # Builds daily AQI + pollutant panel from snapshots
+│   ├── compute_aersi.py         # WHO-normalized AERSI per station (30-day window)
 │   ├── fetch_weather.py         # Batch fetches weather from Open-Meteo ERA5
 │   └── train_forecast.py        # Trains XGBoost next-day AQI model
 ├── aws/
 │   ├── lambda_function.py       # Lambda: alert dispatcher
 │   └── subscribe_lambda.py      # Lambda: subscriber registration
 ├── data/
-│   └── processed/               # CSVs, model pkl, metadata JSON
+│   ├── snapshots/               # 148 raw daily CPCB CSVs
+│   └── processed/               # Panel, weather, AERSI scores, model pkl, metadata JSON
+├── docs/architecture.png
 └── README.md
 ```
 
